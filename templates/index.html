@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lightweight IDS Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background: #0f172a;
+            color: white;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #38bdf8;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .card h2 {
+            margin-bottom: 15px;
+            color: #7dd3fc;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #334155;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            color: #38bdf8;
+        }
+        .alert {
+            background: #7f1d1d;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 5px solid red;
+        }
+        #alertsBox {
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+        details {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #38bdf8;
+        }
+        .small {
+            font-size: 13px;
+            margin-top: 8px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .pause {
+            background: #dc2626;
+            color: white;
+        }
+        .resume {
+            background: #16a34a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Intrusion Detection System Dashboard</h1>
+    <div class="controls">
+        <button class="pause" onclick="pauseCapture()">Pause</button>
+        <button class="resume" onclick="resumeCapture()">Resume</button>
+    </div>
+    <div class="container">
+        <div class="card">
+            <h2>Top Talkers</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Packets</th>
+                    </tr>
+                </thead>
+                <tbody id="topTalkers"></tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h2>Alerts</h2>
+            <div id="alertsBox"></div>
+        </div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+        <h2>Conversation Details</h2>
+        <div id="conversationBox"></div>
+    </div>
+<script>
+
+async function fetchData() {
+    const response = await fetch('/data');
+    const data = await response.json();
+    updateTopTalkers(data.top_talkers);
+    updateAlerts(data.alerts);
+    updateConversations(data.conversations);
+}
+
+function updateTopTalkers(talkers) {
+    const table = document.getElementById('topTalkers');
+    table.innerHTML = '';
+    talkers.forEach(item => {
+        const row = `
+            <tr>
+                <td>${item[0]}</td>
+                <td>${item[1]}</td>
+            </tr>
+        `;
+        table.innerHTML += row;
+    });
+}
+
+function updateAlerts(alerts) {
+    const box = document.getElementById('alertsBox');
+    const latestAlerts = alerts.slice(-7).reverse();
+    box.innerHTML = '';
+    latestAlerts.forEach(alert => {
+        const div = document.createElement('div');
+        div.className = 'alert';
+        div.innerHTML = `
+            <strong>${alert.msg}</strong><br>
+            Time: ${alert.time}
+        `;
+        box.appendChild(div);
+    });
+}
+
+function updateConversations(conversations) {
+    const box = document.getElementById('conversationBox');
+    const openItems = new Set();
+    document.querySelectorAll('#conversationBox details').forEach(detail => {
+        if (detail.open) {
+            openItems.add(detail.dataset.key);
+        }
+    });
+    box.innerHTML = '';
+    conversations.forEach(conv => {
+        const protocols = Object.keys(conv.protocols).join(', ');
+        const isOpen = openItems.has(conv.key) ? 'open' : '';
+        const html = `
+            <details data-key="${conv.key}" ${isOpen}>
+                <summary>
+                    ${conv.key} (${conv.count} packets)
+                </summary>
+                <div class="small">
+                    <b>Protocols:</b> ${protocols}<br>
+                    <b>Ports:</b> ${conv.ports.join(', ')}<br>
+                    <b>Average Packet Size:</b> ${conv.avg_size} bytes<br>
+                    <b>Last Seen:</b> ${conv.last_seen}<br><br>
+                    <b>Payload Preview:</b><br>
+                    ${conv.payload || "No payload captured"}
+                </div>
+            </details>
+        `;
+        box.innerHTML += html;
+    });
+}
+
+async function pauseCapture() {
+    await fetch('/pause');
+}
+async function resumeCapture() {
+    await fetch('/resume');
+}
+setInterval(fetchData, 3000);
+fetchData();
+
+</script>
+
+</body>
+</html>
